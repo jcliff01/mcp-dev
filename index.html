@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP in motion</title>
+<meta name="description" content="An interactive ASCII walkthrough of a Model Context Protocol tool call.">
+<style>
+:root{color-scheme:dark;--bg:#0a1011;--panel:#10191a;--line:#2d4141;--ink:#e5f0ed;--muted:#a6bab6;--mint:#8cf3c8;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% 0,#18302d,var(--bg) 60%);color:var(--ink);font:1rem/1.55 system-ui,sans-serif;min-height:100vh}
+main{width:min(100% - 2rem,900px);margin:auto;padding:clamp(2rem,7vw,5rem) 0 2rem}
+header p{margin:.25rem 0;color:var(--muted)}
+header .protocol{font: .875rem var(--mono);color:var(--mint);letter-spacing:.09em;text-transform:uppercase}
+h1{font-size:clamp(2.75rem,8vw,5rem);letter-spacing:-.075em;line-height:1.05;margin:.45rem 0 .65rem}
+.player{margin:1.75rem 0 1.1rem;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel)}
+.bar,.controls{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;padding:.8rem clamp(.75rem,3vw,1.4rem);background:#172222}
+.bar{justify-content:space-between;font:.875rem var(--mono);color:var(--muted);border-bottom:1px solid var(--line)}
+.stage{padding:1.1rem clamp(.75rem,3vw,1.4rem);background:repeating-linear-gradient(0deg,#0d1616 0 3px,#101a1a 3px 4px)}
+.stage pre{width:max-content;margin:.55rem auto;color:var(--mint);font:clamp(9px,2.5vw,18px)/1.42 var(--mono)}
+.caption,.wire{padding: .95rem clamp(.75rem,3vw,1.4rem);border-top:1px solid var(--line)}
+h2{margin:0 0 .2rem;font-size:1.2rem}
+.caption p{margin:0;color:var(--muted)}
+.controls{border-top:1px solid var(--line)}
+button,select{color:var(--ink);background:#10191a;border:1px solid #527068;border-radius:6px;padding:.5rem .7rem;font:inherit;cursor:pointer}
+button:hover,select:hover{border-color:var(--mint)}
+#play{background:var(--mint);color:#0a221a;font-weight:700;min-width:5.3rem}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+input[type=range]{flex:1 1 9rem;min-width:6rem;accent-color:var(--mint)}
+.wire summary{cursor:pointer;font-family:var(--mono);color:var(--mint)}
+#message{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);font:.875rem/1.5 var(--mono);margin:.65rem 0 0}
+footer{font-size:.9rem;color:var(--muted)}
+a{color:var(--mint)}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="protocol">Model Context Protocol</p>
+<h1>MCP in motion</h1>
+<p>Follow a weather question from the AI app to a tool server and back.</p>
+</header>
+<section class="player" aria-label="ASCII animation player">
+<div class="bar"><span>weather-tool / simulated trace</span><span id="count">01 / 09</span></div>
+<div class="stage"><pre id="art" aria-hidden="true"></pre></div>
+<div class="caption" aria-live="polite"><h2 id="title">The question</h2><p id="caption">The user asks the AI app for the weather in Hoi An.</p></div>
+<div class="controls">
+<button id="play" type="button">Play</button>
+<button id="previous" type="button">Previous</button>
+<button id="next" type="button">Next</button>
+<button id="restart" type="button">Restart</button>
+<input id="timeline" type="range" min="0" max="8" value="0" aria-label="Scene">
+<label for="speed">Speed</label>
+<select id="speed"><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+</div>
+<details class="wire" open><summary>Message trace</summary><pre id="message"></pre></details>
+<noscript><p>Enable JavaScript to play or step through the animation.</p></noscript>
+</section>
+<footer>This simulation uses the <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle">2025-11-25 handshake</a> and <a href="https://modelcontextprotocol.io/specification/2025-11-25/server/tools">MCP tool methods</a>. Weather data is fictional.</footer>
+</main>
+<script>
+const wire = (fields) => ({jsonrpc: "2.0", ...fields});
+const protocolVersion = "2025-11-25";
+const tool = {
+  name: "get_weather",
+  description: "Get the weather for a city.",
+  inputSchema: {type: "object", properties: {city: {type: "string"}}, required: ["city"]}
+};
+const scenes = [
+  ["The question", "The user asks the AI app for the weather in Hoi An.", 0, "User > What's the weather in Hoi An?"],
+  ["Request initialization", "The MCP client inside the app proposes a protocol version and shares its capabilities.", 1,
+    wire({id: 1, method: "initialize", params: {protocolVersion, capabilities: {}, clientInfo: {name: "weather-demo", version: "1.0.0"}}})],
+  ["Agree on capabilities", "The weather server responds with the protocol version it selected and advertises tool support.", -1,
+    wire({id: 1, result: {protocolVersion, capabilities: {tools: {}}, serverInfo: {name: "weather-server", version: "1.0.0"}}})],
+  ["Confirm readiness", "The client sends a notification to complete the handshake. A JSON-RPC notification has no request ID or reply.", 1,
+    wire({method: "notifications/initialized"})],
+  ["Discover tools", "The client asks the server which tools it exposes.", 1, wire({id: 2, method: "tools/list"})],
+  ["Read the tool schema", "The server describes get_weather and its required city argument. The host makes the tool available to the model.", -1,
+    wire({id: 2, result: {tools: [tool]}})],
+  ["Call the weather tool", "The model selects the tool. The host sends the request through its MCP client.", 1,
+    wire({id: 3, method: "tools/call", params: {name: "get_weather", arguments: {city: "Hoi An"}}})],
+  ["Return the result", "The tool runs on the server. The server returns its result using the same request ID.", -1,
+    wire({id: 3, result: {content: [{type: "text", text: "Hoi An: 28 °C, partly cloudy."}]}})],
+  ["Answer the user", "The host gives the result to the model, which turns it into a reply for the user.", 0,
+    "Assistant > It's 28 °C and partly cloudy in Hoi An."]
+];
+
+const byId = (id) => document.getElementById(id);
+const art = byId("art");
+const play = byId("play");
+const previous = byId("previous");
+const next = byId("next");
+const timeline = byId("timeline");
+const speed = byId("speed");
+const duration = 3200;
+let index = 0;
+let elapsed = 0;
+let lastTime = null;
+let animation = null;
+
+function drawPacket() {
+  const direction = scenes[index][2];
+  const motion = matchMedia("(prefers-reduced-motion: reduce)").matches ? .5 : elapsed / duration;
+  const position = Math.round(9 * (direction === 1 ? motion : 1 - motion));
+  const track = direction
+    ? "-".repeat(position) + (direction === 1 ? "o>" : "<o") + "-".repeat(9 - position)
+    : "     .     ";
+  art.textContent = [
+    "+------------+           +-------------+",
+    "|  AI HOST   |           | MCP SERVER  |",
+    "|            |           |             |",
+    "| MCP CLIENT |" + track + "| WEATHER TOOL|",
+    "+------------+           +-------------+"
+  ].join("\n");
+}
+
+function render() {
+  const [title, caption, , message] = scenes[index];
+  byId("title").textContent = title;
+  byId("caption").textContent = caption;
+  byId("message").textContent = typeof message === "string" ? message : JSON.stringify(message, null, 2);
+  byId("count").textContent = String(index + 1).padStart(2, "0") + " / " + String(scenes.length).padStart(2, "0");
+  timeline.value = index;
+  timeline.setAttribute("aria-valuetext", title);
+  previous.disabled = index === 0;
+  next.disabled = index === scenes.length - 1;
+  drawPacket();
+}
+
+function pause(label = "Play") {
+  if (animation !== null) cancelAnimationFrame(animation);
+  animation = null;
+  lastTime = null;
+  play.textContent = label;
+}
+
+function seek(scene) {
+  index = scene;
+  elapsed = 0;
+  lastTime = null;
+  render();
+}
+
+function tick(now) {
+  if (lastTime !== null) elapsed += (now - lastTime) * Number(speed.value);
+  lastTime = now;
+  if (elapsed >= duration) {
+    if (index === scenes.length - 1) {
+      pause("Replay");
+      return;
+    }
+    seek(index + 1);
+    lastTime = now;
+  }
+  drawPacket();
+  animation = requestAnimationFrame(tick);
+}
+
+function scrub(scene) {
+  pause();
+  seek(scene);
+}
+
+play.addEventListener("click", () => {
+  if (animation !== null) {
+    pause();
+    return;
+  }
+  if (elapsed >= duration) seek(0);
+  play.textContent = "Pause";
+  animation = requestAnimationFrame(tick);
+});
+previous.addEventListener("click", () => scrub(index - 1));
+next.addEventListener("click", () => scrub(index + 1));
+byId("restart").addEventListener("click", () => scrub(0));
+timeline.addEventListener("input", () => scrub(Number(timeline.value)));
+document.addEventListener("visibilitychange", () => {
+  lastTime = null;
+});
+render();
+</script>
+</body>
+</html>
