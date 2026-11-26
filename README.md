@@ -1,10 +1,10 @@
 # MCP in Motion
 
+### ▶ [Open the animation](https://jcliff01.github.io/mcp-dev/)
+
 An animation that shows how an AI app talks to a tool server using the Model Context Protocol (MCP): how they connect, agree on what each side can do, and how the app calls a tool and gets the answer back. It's a learning aid; no MCP server, account or install is needed.
 
-![The animation at step 5 of 9: the client asks the server which tools it has](docs/screenshot.png)
-
-**Watch it online:** [jcliff01.github.io/mcp-dev](https://jcliff01.github.io/mcp-dev/)
+[![The animation at step 5 of 9: the client asks the server which tools it has](docs/screenshot.png)](https://jcliff01.github.io/mcp-dev/)
 
 ## Open it on your own computer
 
